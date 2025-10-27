@@ -8,58 +8,87 @@ Educational purposes only.
 
 import os
 import subprocess
+import time
 
-def get_file_path(prompt):
-    """
-    Ask user to provide the full path to a file.
-    On iOS, you can copy the path from the Files app.
-    """
-    path = input(prompt).strip()
-    if not os.path.exists(path):
-        print(f"Error: File not found: {path}")
-        return None
-    return path
+def list_videos_in_directory(directory="."):
+    """List all MP4 files in the specified directory."""
+    return [f for f in os.listdir(directory) if f.lower().endswith(".mp4")]
+
+def select_video():
+    """Let the user select a video file from a list of available MP4s."""
+    while True:
+        current_dir = os.getcwd()
+        videos = list_videos_in_directory(current_dir)
+
+        if not videos:
+            print("Hmm, I didn’t find any MP4 videos in this folder.")
+            print("You can paste a full file path manually instead.\n")
+            path = input("Enter full path to MP4 video: ").strip()
+            if os.path.exists(path):
+                return path
+            print("File not found — let’s try that again.\n")
+            continue
+
+        print("\n=== Available MP4 Videos ===")
+        for i, vid in enumerate(videos, 1):
+            print(f"{i}. {vid}")
+        print("(Or type a full path manually)\n")
+
+        choice = input("Select your video to make Buffer Video: ").strip()
+
+        if choice.isdigit():
+            index = int(choice)
+            if 1 <= index <= len(videos):
+                return os.path.join(current_dir, videos[index - 1])
+            else:
+                print("That number doesn’t match any file — try again.\n")
+        else:
+            if os.path.exists(choice):
+                return choice
+            else:
+                print("File not found — check your path and try again.\n")
 
 def main():
     print("=== Video Buffer Generator ===\n")
 
-    # 1. Get input MP4 video
-    while True:
-        video_path = get_file_path("Enter path to input MP4 video: ")
-        if video_path:
-            break
+    video_path = select_video()
 
-    # 2. Glitch buffer video
     glitch_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "RawBuffer", "glitch.mp4")
     if not os.path.exists(glitch_path):
-        print(f"Error: Missing glitch video at {glitch_path}")
+        print(f"Oops! Missing glitch video at {glitch_path}")
         return
 
-    # 3. Output path
     while True:
         output_path = input("Enter output path (including filename, .mp4): ").strip()
         if output_path:
             output_dir = os.path.dirname(output_path)
-            if not os.path.exists(output_dir):
+            if output_dir and not os.path.exists(output_dir):
                 os.makedirs(output_dir)
             break
 
-    # 4. Create temporary concat list for FFmpeg
-    concat_list = os.path.join(output_dir, "temp_list.txt")
+    concat_list = os.path.join(output_dir or ".", "temp_list.txt")
     with open(concat_list, "w", encoding="utf-8") as f:
         f.write(f"file '{video_path}'\n")
         f.write(f"file '{glitch_path}'\n")
 
-    # 5. Run FFmpeg
+    print("\nAlright, generating your buffer video...")
+    time.sleep(1)
+    print("This might take a few seconds, hang tight ⏳")
+
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list, "-c", "copy", output_path]
-    print("\nGenerating video buffer... This may take a moment.")
 
     try:
         subprocess.run(cmd, check=True)
         os.remove(concat_list)
-        print(f"\nSuccess! Video saved to: {output_path}")
+        time.sleep(0.5)
+        print("\nDone! ✅")
+        time.sleep(0.3)
+        print(f"Your new video is ready and saved to:\n{output_path}\n")
+        time.sleep(0.3)
+        print("All set — enjoy your glitch buffer video! 🎬")
     except subprocess.CalledProcessError:
-        print("\nError: FFmpeg failed to generate video. Make sure FFmpeg is installed and working.")
+        print("\nHmm... something went wrong with FFmpeg.")
+        print("Make sure it’s installed and try again.")
 
 if __name__ == "__main__":
     main()
