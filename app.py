@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Video Buffer Generator (iSH / a-Shell / iPhone-Friendly)
-Automatically scans for MP4 videos in your Documents folder (a-Shell files)
+Video Buffer Generator (Cross-Platform: iSH / a-Shell / Termux / iPhone / Android)
+Automatically scans for MP4 videos in your Documents (or home) folder
 and joins the selected one with a glitch buffer using FFmpeg.
 
 Educational purposes only.
@@ -10,10 +10,18 @@ Educational purposes only.
 import os
 import subprocess
 import time
+import platform
 
 # === Configuration ===
-# This is where a-Shell stores your files (Documents folder on iPhone)
-DEFAULT_SEARCH_DIR = os.path.expanduser("~/Documents")
+# Default search directory (depends on system)
+SYSTEM = platform.system().lower()
+
+if "linux" in SYSTEM:  # Termux or Android/Linux
+    DEFAULT_SEARCH_DIR = os.path.expanduser("~/storage/shared") if os.path.exists(os.path.expanduser("~/storage/shared")) else os.path.expanduser("~")
+elif "darwin" in SYSTEM:  # iOS (a-Shell / iSH)
+    DEFAULT_SEARCH_DIR = os.path.expanduser("~/Documents")
+else:
+    DEFAULT_SEARCH_DIR = os.path.expanduser("~")
 
 # === Utility Functions ===
 def list_all_videos(base_dir):
@@ -33,13 +41,12 @@ def select_video(videos):
     Let the user select a video file from the list.
     """
     if not videos:
-        print(f"No MP4 files found in {DEFAULT_SEARCH_DIR}.")
-        print("You can copy videos into a-Shell's Documents folder and try again.\n")
+        print(f"\nNo MP4 files found in {DEFAULT_SEARCH_DIR}.")
+        print("Please copy videos there and try again.\n")
         return None
 
     print("\n=== Found MP4 Videos ===")
     for i, path in enumerate(videos, 1):
-        # Show just filename, but store full path
         print(f"{i}. {os.path.basename(path)}")
     print()
 
@@ -57,7 +64,7 @@ def select_video(videos):
 def main():
     print("=== Video Buffer Generator ===\n")
 
-    # 1. Search for all MP4 videos in ~/Documents
+    # 1. Search for all MP4 videos
     print(f"Scanning for videos in: {DEFAULT_SEARCH_DIR} ...")
     videos = list_all_videos(DEFAULT_SEARCH_DIR)
 
@@ -68,12 +75,21 @@ def main():
     # 2. Glitch buffer video
     glitch_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "RawBuffer", "glitch.mp4")
     if not os.path.exists(glitch_path):
-        print(f"Oops! Missing glitch video at {glitch_path}")
+        print(f"❌ Missing glitch video at {glitch_path}")
         return
 
-    # 3. Output path
+    # 3. Ask for custom output filename
+    print()
+    buffer_name = input("Name your Buffer Video file (without .mp4): ").strip()
+    if not buffer_name:
+        buffer_name = os.path.splitext(os.path.basename(video_path))[0] + "_buffered"
+
+    # Ensure .mp4 extension
+    if not buffer_name.lower().endswith(".mp4"):
+        buffer_name += ".mp4"
+
     base_dir = os.path.dirname(video_path)
-    output_path = os.path.join(base_dir, f"{os.path.splitext(os.path.basename(video_path))[0]}_buffered.mp4")
+    output_path = os.path.join(base_dir, buffer_name)
 
     # 4. Create temporary concat list
     concat_list = os.path.join(base_dir, "temp_list.txt")
@@ -82,9 +98,9 @@ def main():
         f.write(f"file '{glitch_path}'\n")
 
     # 5. Run FFmpeg
-    print("\nAlright, generating your buffer video...")
+    print("\nGenerating your buffer video...")
     time.sleep(1)
-    print("This might take a few seconds, hang tight ⏳")
+    print("Please wait ⏳")
 
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list, "-c", "copy", output_path]
 
@@ -93,12 +109,10 @@ def main():
         os.remove(concat_list)
         time.sleep(0.5)
         print("\n✅ Done!")
-        time.sleep(0.3)
         print(f"Your new video is ready:\n{output_path}\n")
-        time.sleep(0.3)
         print("All set — enjoy your glitch buffer video! 🎬")
     except subprocess.CalledProcessError:
-        print("\n❌ FFmpeg failed. Make sure it's installed and working in a-Shell.")
+        print("\n❌ FFmpeg failed. Make sure it's installed and working in your terminal.")
 
 if __name__ == "__main__":
     main()
