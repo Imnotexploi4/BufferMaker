@@ -28,6 +28,7 @@ SUPPORTED_FORMATS = (
     ".mpeg", ".mpg", ".m4v", ".3gp", ".wav", ".flac"
 )
 
+
 # === Utility Functions ===
 def list_all_videos(base_dir):
     """Recursively search for all supported video/audio files."""
@@ -49,6 +50,12 @@ def ffmpeg_supports_libx264():
         return False
 
 
+def is_ios_shell():
+    """Detect if running in a-Shell or iSH (iOS)."""
+    shell = os.environ.get("SHELL", "").lower()
+    return "ish" in shell or "a-shell" in shell or "ios" in SYSTEM
+
+
 def convert_to_mp4(input_path):
     """
     Converts any video/audio file to MP4 format using FFmpeg.
@@ -63,7 +70,7 @@ def convert_to_mp4(input_path):
 
     print(f"\n🎞️  Converting '{os.path.basename(input_path)}' → MP4...")
 
-    # Detect audio-only input
+    # Detect if input has a video stream
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v",
          "-show_entries", "stream=codec_type", "-of", "csv=p=0", input_path],
@@ -71,12 +78,12 @@ def convert_to_mp4(input_path):
     )
     is_audio_only = (probe.returncode == 0 and "video" not in probe.stdout)
 
-    # Detect whether we can use libx264 and preset
-    video_codec = "libx264" if ffmpeg_supports_libx264() else "mpeg4"
-    is_ios_shell = "darwin" in SYSTEM and ("a-shell" in os.environ.get("SHELL", "").lower() or "ish" in os.environ.get("SHELL", "").lower())
+    # Decide codecs
+    ios_mode = is_ios_shell()
+    use_libx264 = ffmpeg_supports_libx264()
 
-    # FFmpeg command builder
     if is_audio_only:
+        # Convert audio-only to mp4 container
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-i", input_path,
@@ -85,18 +92,20 @@ def convert_to_mp4(input_path):
             output_path
         ]
     else:
+        # Use libx264 if available; else fallback to mpeg4
+        vcodec = "libx264" if use_libx264 else "mpeg4"
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-i", input_path,
-            "-c:v", video_codec,
+            "-c:v", vcodec,
             "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             output_path
         ]
 
-        # Add preset ONLY if not running in a-Shell / iSH
-        if not is_ios_shell:
+        # Add preset only if NOT in a-Shell / iSH
+        if not ios_mode and vcodec == "libx264":
             cmd.insert(cmd.index("-pix_fmt"), "-preset")
             cmd.insert(cmd.index("-pix_fmt") + 1, "fast")
 
