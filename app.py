@@ -26,14 +26,12 @@ else:
 # Supported formats
 SUPPORTED_FORMATS = (
     ".mp4", ".mov", ".avi", ".mkv", ".flv", ".webm",
-    ".mpeg", ".mpg", ".m4v", ".3gp", ".wav"
+    ".mpeg", ".mpg", ".m4v", ".3gp", ".wav", ".flac"
 )
 
 # === Utility Functions ===
 def list_all_videos(base_dir):
-    """
-    Recursively search for all supported video files (except MP3).
-    """
+    """Recursively search for all supported video/audio files (except MP3)."""
     video_files = []
     for root, _, files in os.walk(base_dir):
         for name in files:
@@ -45,37 +43,66 @@ def list_all_videos(base_dir):
 
 def convert_to_mp4(input_path):
     """
-    Converts the given video/audio file to MP4 format using FFmpeg.
+    Converts any video/audio file to MP4 format using FFmpeg.
+    Automatically handles codecs and unsupported streams.
     Returns the new file path.
     """
-    base, _ = os.path.splitext(input_path)
+    base, ext = os.path.splitext(input_path)
     output_path = base + "_converted.mp4"
 
+    # Skip if already converted
+    if os.path.exists(output_path):
+        print(f"\n⚠️  Converted file already exists: {output_path}")
+        return output_path
+
     print(f"\n🎞️  Converting '{os.path.basename(input_path)}' → MP4...")
-    cmd = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-c:v", "libx264", "-c:a", "aac",
-        "-strict", "experimental", output_path
-    ]
+
+    # Check if file has a video stream
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v",
+         "-show_entries", "stream=codec_type", "-of", "csv=p=0", input_path],
+        capture_output=True, text=True
+    )
+    is_audio_only = (probe.returncode == 0 and "video" not in probe.stdout)
+
+    # FFmpeg command
+    if is_audio_only:
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", input_path,
+            "-c:a", "aac", "-b:a", "192k",
+            "-vn",  # no video
+            "-movflags", "+faststart",
+            output_path
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", input_path,
+            "-c:v", "libx264", "-preset", "fast",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
+            output_path
+        ]
 
     try:
         subprocess.run(cmd, check=True)
         print(f"✅ Converted successfully: {output_path}\n")
         return output_path
     except subprocess.CalledProcessError:
-        print(f"❌ Failed to convert {input_path}")
+        print(f"❌ Conversion failed for {input_path}")
+        print("⚠️ Make sure FFmpeg is installed and supports your input codec.")
         return None
 
 def select_video(videos):
-    """
-    Let the user select a video file from the list.
-    """
+    """Let the user select a video file from the list."""
     if not videos:
         print(f"\nNo supported video files found in {DEFAULT_SEARCH_DIR}.")
         print("Please copy videos there and try again.\n")
         return None
 
-    print("\n=== Found All Videos File ===")
+    print("\n=== Found Video/Audio Files ===")
     for i, path in enumerate(videos, 1):
         print(f"{i}. {os.path.basename(path)}")
     print()
