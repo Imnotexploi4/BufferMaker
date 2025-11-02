@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Video Buffer Generator (Cross-Platform: iSH / a-Shell / Termux / iPhone / Android)
-Automatically scans for MP4 videos in your Documents (or home) folder
-and joins the selected one with a glitch buffer using FFmpeg.
+Lists all supported video formats (.mp4, .mov, .avi, .mkv, .flv, .webm, .wav, etc.)
+After selecting a file, automatically converts it to MP4 (if needed),
+then joins it with a glitch buffer using FFmpeg.
 
 Educational purposes only.
 """
@@ -13,7 +14,6 @@ import time
 import platform
 
 # === Configuration ===
-# Default search directory (depends on system)
 SYSTEM = platform.system().lower()
 
 if "linux" in SYSTEM:  # Termux or Android/Linux
@@ -23,29 +23,59 @@ elif "darwin" in SYSTEM:  # iOS (a-Shell / iSH)
 else:
     DEFAULT_SEARCH_DIR = os.path.expanduser("~")
 
+# Supported formats
+SUPPORTED_FORMATS = (
+    ".mp4", ".mov", ".avi", ".mkv", ".flv", ".webm",
+    ".mpeg", ".mpg", ".m4v", ".3gp", ".wav"
+)
+
 # === Utility Functions ===
 def list_all_videos(base_dir):
     """
-    Recursively search for all .mp4 files in the base_dir and its subfolders.
+    Recursively search for all supported video files (except MP3).
     """
     video_files = []
     for root, _, files in os.walk(base_dir):
         for name in files:
-            if name.lower().endswith(".mp4"):
+            ext = os.path.splitext(name.lower())[1]
+            if ext in SUPPORTED_FORMATS and ext != ".mp3":
                 full_path = os.path.join(root, name)
                 video_files.append(full_path)
     return sorted(video_files)
+
+def convert_to_mp4(input_path):
+    """
+    Converts the given video/audio file to MP4 format using FFmpeg.
+    Returns the new file path.
+    """
+    base, _ = os.path.splitext(input_path)
+    output_path = base + "_converted.mp4"
+
+    print(f"\n🎞️  Converting '{os.path.basename(input_path)}' → MP4...")
+    cmd = [
+        "ffmpeg", "-y", "-i", input_path,
+        "-c:v", "libx264", "-c:a", "aac",
+        "-strict", "experimental", output_path
+    ]
+
+    try:
+        subprocess.run(cmd, check=True)
+        print(f"✅ Converted successfully: {output_path}\n")
+        return output_path
+    except subprocess.CalledProcessError:
+        print(f"❌ Failed to convert {input_path}")
+        return None
 
 def select_video(videos):
     """
     Let the user select a video file from the list.
     """
     if not videos:
-        print(f"\nNo MP4 files found in {DEFAULT_SEARCH_DIR}.")
+        print(f"\nNo supported video files found in {DEFAULT_SEARCH_DIR}.")
         print("Please copy videos there and try again.\n")
         return None
 
-    print("\n=== Found MP4 Videos ===")
+    print("\n=== Found All Videos File ===")
     for i, path in enumerate(videos, 1):
         print(f"{i}. {os.path.basename(path)}")
     print()
@@ -64,7 +94,7 @@ def select_video(videos):
 def main():
     print("=== Video Buffer Generator ===\n")
 
-    # 1. Search for all MP4 videos
+    # 1. Search for videos
     print(f"Scanning for videos in: {DEFAULT_SEARCH_DIR} ...")
     videos = list_all_videos(DEFAULT_SEARCH_DIR)
 
@@ -72,13 +102,20 @@ def main():
     if not video_path:
         return
 
-    # 2. Glitch buffer video
+    # 2. Convert to MP4 if needed
+    if not video_path.lower().endswith(".mp4"):
+        converted = convert_to_mp4(video_path)
+        if not converted:
+            return
+        video_path = converted
+
+    # 3. Check glitch buffer video
     glitch_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "RawBuffer", "glitch.mp4")
     if not os.path.exists(glitch_path):
         print(f"❌ Missing glitch video at {glitch_path}")
         return
 
-    # 3. Ask for custom output filename
+    # 4. Ask for custom output filename
     print()
     buffer_name = input("Name your Buffer Video file (without .mp4): ").strip()
     if not buffer_name:
@@ -91,13 +128,13 @@ def main():
     base_dir = os.path.dirname(video_path)
     output_path = os.path.join(base_dir, buffer_name)
 
-    # 4. Create temporary concat list
+    # 5. Create temporary concat list
     concat_list = os.path.join(base_dir, "temp_list.txt")
     with open(concat_list, "w", encoding="utf-8") as f:
         f.write(f"file '{video_path}'\n")
         f.write(f"file '{glitch_path}'\n")
 
-    # 5. Run FFmpeg
+    # 6. Combine files using FFmpeg
     print("\nGenerating your buffer video...")
     time.sleep(1)
     print("Please wait ⏳")
