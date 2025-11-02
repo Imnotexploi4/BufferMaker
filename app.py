@@ -23,7 +23,6 @@ elif "darwin" in SYSTEM:  # iOS (a-Shell / iSH)
 else:
     DEFAULT_SEARCH_DIR = os.path.expanduser("~")
 
-# Supported formats
 SUPPORTED_FORMATS = (
     ".mp4", ".mov", ".avi", ".mkv", ".flv", ".webm",
     ".mpeg", ".mpg", ".m4v", ".3gp", ".wav", ".flac"
@@ -31,33 +30,40 @@ SUPPORTED_FORMATS = (
 
 # === Utility Functions ===
 def list_all_videos(base_dir):
-    """Recursively search for all supported video/audio files (except MP3)."""
+    """Recursively search for all supported video/audio files."""
     video_files = []
     for root, _, files in os.walk(base_dir):
         for name in files:
             ext = os.path.splitext(name.lower())[1]
             if ext in SUPPORTED_FORMATS and ext != ".mp3":
-                full_path = os.path.join(root, name)
-                video_files.append(full_path)
+                video_files.append(os.path.join(root, name))
     return sorted(video_files)
+
+
+def ffmpeg_supports_libx264():
+    """Check if FFmpeg supports libx264 encoder."""
+    try:
+        result = subprocess.run(["ffmpeg", "-hide_banner", "-codecs"], capture_output=True, text=True)
+        return "libx264" in result.stdout
+    except Exception:
+        return False
+
 
 def convert_to_mp4(input_path):
     """
     Converts any video/audio file to MP4 format using FFmpeg.
-    Automatically handles codecs and unsupported streams.
-    Returns the new file path.
+    Removes unsupported options automatically for a-Shell/iSH.
     """
-    base, ext = os.path.splitext(input_path)
+    base, _ = os.path.splitext(input_path)
     output_path = base + "_converted.mp4"
 
-    # Skip if already converted
     if os.path.exists(output_path):
         print(f"\n⚠️  Converted file already exists: {output_path}")
         return output_path
 
     print(f"\n🎞️  Converting '{os.path.basename(input_path)}' → MP4...")
 
-    # Check if file has a video stream
+    # Detect audio-only input
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v",
          "-show_entries", "stream=codec_type", "-of", "csv=p=0", input_path],
@@ -65,26 +71,34 @@ def convert_to_mp4(input_path):
     )
     is_audio_only = (probe.returncode == 0 and "video" not in probe.stdout)
 
-    # FFmpeg command
+    # Detect whether we can use libx264 and preset
+    video_codec = "libx264" if ffmpeg_supports_libx264() else "mpeg4"
+    is_ios_shell = "darwin" in SYSTEM and ("a-shell" in os.environ.get("SHELL", "").lower() or "ish" in os.environ.get("SHELL", "").lower())
+
+    # FFmpeg command builder
     if is_audio_only:
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-i", input_path,
             "-c:a", "aac", "-b:a", "192k",
-            "-vn",  # no video
-            "-movflags", "+faststart",
+            "-vn", "-movflags", "+faststart",
             output_path
         ]
     else:
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-i", input_path,
-            "-c:v", "libx264", "-preset", "fast",
+            "-c:v", video_codec,
             "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             output_path
         ]
+
+        # Add preset ONLY if not running in a-Shell / iSH
+        if not is_ios_shell:
+            cmd.insert(cmd.index("-pix_fmt"), "-preset")
+            cmd.insert(cmd.index("-pix_fmt") + 1, "fast")
 
     try:
         subprocess.run(cmd, check=True)
@@ -94,6 +108,7 @@ def convert_to_mp4(input_path):
         print(f"❌ Conversion failed for {input_path}")
         print("⚠️ Make sure FFmpeg is installed and supports your input codec.")
         return None
+
 
 def select_video(videos):
     """Let the user select a video file from the list."""
@@ -118,10 +133,10 @@ def select_video(videos):
         else:
             print("Please enter a number from the list above.\n")
 
+
 def main():
     print("=== Video Buffer Generator ===\n")
 
-    # 1. Search for videos
     print(f"Scanning for videos in: {DEFAULT_SEARCH_DIR} ...")
     videos = list_all_videos(DEFAULT_SEARCH_DIR)
 
@@ -129,39 +144,33 @@ def main():
     if not video_path:
         return
 
-    # 2. Convert to MP4 if needed
     if not video_path.lower().endswith(".mp4"):
         converted = convert_to_mp4(video_path)
         if not converted:
             return
         video_path = converted
 
-    # 3. Check glitch buffer video
     glitch_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "RawBuffer", "glitch.mp4")
     if not os.path.exists(glitch_path):
         print(f"❌ Missing glitch video at {glitch_path}")
         return
 
-    # 4. Ask for custom output filename
     print()
     buffer_name = input("Name your Buffer Video file (without .mp4): ").strip()
     if not buffer_name:
         buffer_name = os.path.splitext(os.path.basename(video_path))[0] + "_buffered"
 
-    # Ensure .mp4 extension
     if not buffer_name.lower().endswith(".mp4"):
         buffer_name += ".mp4"
 
     base_dir = os.path.dirname(video_path)
     output_path = os.path.join(base_dir, buffer_name)
 
-    # 5. Create temporary concat list
     concat_list = os.path.join(base_dir, "temp_list.txt")
     with open(concat_list, "w", encoding="utf-8") as f:
         f.write(f"file '{video_path}'\n")
         f.write(f"file '{glitch_path}'\n")
 
-    # 6. Combine files using FFmpeg
     print("\nGenerating your buffer video...")
     time.sleep(1)
     print("Please wait ⏳")
@@ -177,6 +186,7 @@ def main():
         print("All set — enjoy your glitch buffer video! 🎬")
     except subprocess.CalledProcessError:
         print("\n❌ FFmpeg failed. Make sure it's installed and working in your terminal.")
+
 
 if __name__ == "__main__":
     main()
