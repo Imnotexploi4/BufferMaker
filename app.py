@@ -59,6 +59,7 @@ def is_ios_shell():
 def convert_to_mp4(input_path):
     """
     Converts any video/audio file to MP4 format using FFmpeg.
+    Asks user for output quality (resolution).
     Removes unsupported options automatically for a-Shell/iSH.
     """
     base, _ = os.path.splitext(input_path)
@@ -78,12 +79,35 @@ def convert_to_mp4(input_path):
     )
     is_audio_only = (probe.returncode == 0 and "video" not in probe.stdout)
 
-    # Decide codecs
     ios_mode = is_ios_shell()
     use_libx264 = ffmpeg_supports_libx264()
 
+    # === Ask user for output quality ===
+    quality_map = {
+        "144p": "256x144",
+        "240p": "426x240",
+        "360p": "640x360",
+        "480p": "854x480",
+        "720p": "1280x720",
+        "1080p": "1920x1080"
+    }
+
+    if not is_audio_only:
+        print("\nAvailable quality options:")
+        for q in quality_map.keys():
+            print(" -", q)
+        print()
+        chosen_quality = input("Need quality to convert (144p, 240p, 360p, 480p, 720p, 1080p): ").strip().lower()
+        if chosen_quality not in quality_map:
+            print("⚠️ Invalid quality. Defaulting to 720p.")
+            chosen_quality = "720p"
+        resolution = quality_map[chosen_quality]
+    else:
+        resolution = None
+        chosen_quality = "audio-only"
+
+    # === Build FFmpeg command ===
     if is_audio_only:
-        # Convert audio-only to mp4 container
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-i", input_path,
@@ -92,11 +116,11 @@ def convert_to_mp4(input_path):
             output_path
         ]
     else:
-        # Use libx264 if available; else fallback to mpeg4
         vcodec = "libx264" if use_libx264 else "mpeg4"
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
             "-i", input_path,
+            "-vf", f"scale={resolution}",
             "-c:v", vcodec,
             "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
@@ -104,14 +128,14 @@ def convert_to_mp4(input_path):
             output_path
         ]
 
-        # Add preset only if NOT in a-Shell / iSH
         if not ios_mode and vcodec == "libx264":
             cmd.insert(cmd.index("-pix_fmt"), "-preset")
             cmd.insert(cmd.index("-pix_fmt") + 1, "fast")
 
+    # === Run conversion ===
     try:
         subprocess.run(cmd, check=True)
-        print(f"✅ Converted successfully: {output_path}\n")
+        print(f"✅ Converted successfully at {chosen_quality}: {output_path}\n")
         return output_path
     except subprocess.CalledProcessError:
         print(f"❌ Conversion failed for {input_path}")
