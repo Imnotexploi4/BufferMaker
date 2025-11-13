@@ -1,3 +1,6 @@
+# DISCLAIMER
+This repository is Folked as BufferMaker. I do not copyright on this original repository.
+
 # Video Buffer Generator
 
 A small python utility that stitches an mp4 file to a short glitch clip (glitch.mp4) with ffmpeg so you get a clean buffer between scenes. No re-encode, just a straight stream copy, so it’s fast and keeps the quality.
