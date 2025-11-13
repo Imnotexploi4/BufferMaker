@@ -1,38 +1,73 @@
+# BufferMaker Mobile Version
+
 # DISCLAIMER
-This repository is Folked as BufferMaker. I do not copyright on this original repository.
-
-# Video Buffer Generator
-
-A small python utility that stitches an mp4 file to a short glitch clip (glitch.mp4) with ffmpeg so you get a clean buffer between scenes. No re-encode, just a straight stream copy, so it’s fast and keeps the quality.
-
-## What it does
-
-- Tkinter gui – drag, click, done  
-- Concatenates your clip with RawBuffer/glitch.mp4  
-- Lets you pick the output name and folder  
-- Adds a one-line credit + description you can edit  
-
-## Before you start
-
-You’ll need:
-
-- Python 3.8 or newer  
-- ffmpeg in your path (windows build or brew install ffmpeg)
-
-## Quick setup (windows)
-
-1. Grab python from python.org and tick “add to PATH” during install.  
-2. Download a static ffmpeg build, unzip, and drop the bin folder into PATH.  
-3. Clone or unzip this repo, open cmd inside the folder and run:
-
-```bash
-python app.py
-```
-
-Pick your video, hit “create buffer”, and the new file lands where you chose.
-
-**IF* you choose to upload a crash video to TikTok or any other platform, please note that this only works if you upload using the PC-side uploader. 
+This repository is forked from **BufferMaker**. I do **not** claim copyright on the original repository.  
+Use responsibly; this script is for **educational purposes** only.
 
 ---
 
-**Note:** *This script was created for educational purposes. I am not responsible for the use of this script.*
+# Video Buffer Generator (Mobile Version)
+
+A small Python utility that **stitches an MP4 file to a short glitch clip (`glitch.mp4`)** using `ffmpeg`.  
+It provides a **clean buffer between scenes**, fast and without re-encoding (stream copy), so quality is preserved.
+
+---
+
+## What it does
+- CLI menu interface – select file, enter output name, done
+- Concatenates your clip with `RawBuffer/glitch.mp4`
+- Lets you pick the output name and folder
+- Optional one-line credit or description you can edit
+
+---
+
+## Before you start
+You’ll need:
+- Python 3.8 or newer
+- FFmpeg installed and in your path
+
+---
+
+## Installing on Mobile
+
+### Android (Termux)
+Run each command **separately**:
+
+```bash
+pkg update
+pkg upgrade
+pkg install python
+pkg install ffmpeg
+termux-setup-storage  # optional, allows Termux to access Downloads
+````
+
+### iOS (a-Shell / iSH / a-Shell mini)
+
+* Python 3.8+ (usually preinstalled)
+* FFmpeg comes preinstalled in a-Shell
+* Place MP4 files in `~/Documents`
+
+---
+
+## Quick Setup
+
+1. Clone or unzip this repo into a folder on your device.
+2. Place your MP4 files in the same folder as `app.py`.
+3. Ensure `RawBuffer/glitch.mp4` exists.
+4. Open terminal / a-Shell and navigate to the folder:
+
+```bash
+cd ~/Documents/BufferMaker   # iOS
+cd ~/storage/downloads/BufferMaker  # Termux
+python3 app.py
+```
+
+5. Select your video, enter output name and folder.
+6. The new file will appear in your chosen folder (default `output/`).
+
+> **Important:** If you intend to upload a crash video to TikTok or other platforms, this only works if uploading from a PC-side uploader.
+
+---
+
+**Note:**
+*This script is created for educational purposes. I am **not responsible** for misuse.*
